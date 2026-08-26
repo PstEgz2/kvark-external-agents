@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Tools · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+<div class="panel">
+  <h2>Tools this agent may call</h2>
+  <p class="hint">
+    <code>GET /tools</code> returns only what this agent was granted — filtered by grant rather than
+    merely documented. A tool that exists but is internal and a tool that does not exist both answer
+    <code>404</code>, deliberately, so the status code cannot be used to enumerate KVARK's tooling.
+  </p>
+
+  {% if granted is defined %}
+    {% if granted %}
+      <table>
+        <thead><tr><th class="mono">name</th><th>description</th><th></th></tr></thead>
+        <tbody>
+        {% for tool in granted %}
+          <tr>
+            <td class="mono">{{ tool.name }}</td>
+            <td class="dim">{{ tool.description }}</td>
+            <td><a href="#call" onclick="fill('{{ tool.name }}')">call →</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="dim">
+        No tools granted. The agent may still have been approved — tools are ticked separately from
+        features, and an administrator may have given fewer than were requested.
+      </p>
+    {% endif %}
+  {% endif %}
+</div>
+
+<div class="panel" id="call">
+  <h2>Call one</h2>
+  <p class="hint">Arguments go through as sent; the gateway validates them against the tool's own signature.</p>
+  <form method="post" action="/tools">
+    <div class="field">
+      <label for="tool_name">tool_name</label>
+      <input type="text" id="tool_name" name="tool_name" value="{{ tool_name or '' }}" required>
+    </div>
+    <div class="field">
+      <label for="arguments">arguments — JSON object</label>
+      <textarea id="arguments" name="arguments" rows="5">{}</textarea>
+    </div>
+    <button class="primary" type="submit">Call</button>
+  </form>
+
+  <details class="log">
+    <summary>argument templates</summary>
+    <table>
+      <tbody>
+      {% for name, template in tool_templates.items() %}
+        <tr>
+          <td class="mono">{{ name }}</td>
+          <td class="mono dim">{{ template | tojson }}</td>
+          <td><a href="#call" onclick='fillWith("{{ name }}", {{ template | tojson }})'>use</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</div>
+
+{% if result %}
+  <div class="panel">
+    <h2>{{ result.tool }} · {{ result.kind }}</h2>
+    <pre class="out">{{ result.text }}</pre>
+    {% if result.sources %}
+      <details class="log">
+        <summary>{{ result.sources | length }} source(s)</summary>
+        <pre class="out">{{ result.sources | tojson(indent=2) }}</pre>
+      </details>
+    {% endif %}
+  </div>
+{% endif %}
+
+<script>
+const TEMPLATES = {{ tool_templates | tojson }};
+function fill(name) { fillWith(name, TEMPLATES[name] || {}); }
+function fillWith(name, template) {
+  document.getElementById("tool_name").value = name;
+  document.getElementById("arguments").value = JSON.stringify(template, null, 2);
+}
+</script>
+
+{% endblock %}

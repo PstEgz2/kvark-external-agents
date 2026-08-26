@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Sign in · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+<div class="panel">
+  <h2>Act for a person</h2>
+  <p class="hint">
+    The agent key says <em>which agent this is</em>. A bearer token says <em>who it is acting for</em>.
+    Almost every call needs both, and the answers this agent gets are the answers that person is
+    allowed to have.
+  </p>
+
+  <div class="grid2">
+    <form method="post" action="/login">
+      <div class="field">
+        <label for="identifier">KVARK username or email</label>
+        <input type="text" id="identifier" name="identifier" value="{{ identifier or 'admin' }}" autofocus>
+      </div>
+      <div class="field">
+        <label for="password">password</label>
+        <input type="password" id="password" name="password">
+      </div>
+      <button class="primary" type="submit">Sign in</button>
+      <p class="hint" style="margin-top:12px">
+        Exchanged for a 24-hour KVARK access token at
+        <code>{{ settings.kvark_api_base }}/auth/login</code>.
+      </p>
+    </form>
+
+    <form method="post" action="/login">
+      <div class="field">
+        <label for="token">…or paste a bearer token</label>
+        <textarea id="token" name="token" rows="6" placeholder="eyJhbGciOi…"></textarea>
+      </div>
+      <button type="submit">Use this token</button>
+      <p class="hint" style="margin-top:12px">
+        Closer to how a real partner works — the token arrives, it is never minted here. Also the way to
+        see <code>401 identity_rejected</code>: paste anything and watch the gateway refuse it rather
+        than silently fall back to another method.
+      </p>
+    </form>
+  </div>
+</div>
+
+<div class="warnbox">
+  <div class="head">why this is the weak part of the design</div>
+  A partner application holding KVARK passwords is not the shape a real integration should ship. The
+  gateway already carries the better path — it accepts a directory-issued token when
+  <code>AGENT_GATEWAY_IDP_ISSUER</code>, <code>_AUDIENCE</code> and <code>_JWKS_URL</code> are configured
+  against the same Microsoft AD the accounts came from. Nothing else in this application changes when
+  that lands: everything downstream already treats the token as opaque.
+</div>
+
+{% endblock %}

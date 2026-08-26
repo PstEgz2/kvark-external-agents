@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Manifest · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+{% if accepted %}
+  <div class="notice">
+    <div class="head">202 recorded — not applied</div>
+    Version row {{ accepted.id }} is <code>{{ accepted.status }}</code>. This agent goes on running the
+    manifest it was approved with, and the capabilities it already had, until an administrator accepts
+    this one. A version that asks for a new tool does not receive it by being sent.
+  </div>
+  <div class="panel">
+    <h2>What KVARK recorded</h2>
+    <div class="grid2">
+      <div>
+        <label>submitted — verbatim, what was sent</label>
+        <pre class="out">{{ accepted.submitted | tojson(indent=2) }}</pre>
+      </div>
+      <div>
+        <label>document — resolved over the manifest in force</label>
+        <pre class="out">{{ accepted.document | tojson(indent=2) }}</pre>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:12px">
+      Both are on the wire so the review screen can show the difference between what was asked for and
+      what it would mean.
+    </p>
+  </div>
+{% endif %}
+
+<div class="panel">
+  <h2>Submit an update</h2>
+  <p class="hint">
+    The one call authenticated by the agent key alone — this is the agent speaking about itself rather
+    than for a person, so it carries no user token.
+  </p>
+
+  {% if not agent %}
+    <p class="dim">Not registered yet. <a href="/setup">Register first →</a></p>
+  {% else %}
+    <form method="post" action="/manifest">
+      <div class="field">
+        <label for="manifest_json">manifest — only the fields that changed</label>
+        <textarea id="manifest_json" name="manifest_json" rows="8">{{ draft or '{\n  "version": "2.0.0"\n}' }}</textarea>
+      </div>
+      <div class="field">
+        <label for="changelog">changelog — the part a human actually reads</label>
+        <input type="text" id="changelog" name="changelog"
+               placeholder="Adds board listing so answers can cite the board a document came from.">
+      </div>
+      <button class="primary" type="submit">Submit</button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>Rules that bite</h2>
+  <table>
+    <tbody>
+      <tr>
+        <td><strong>Send only what changed</strong></td>
+        <td class="dim">The submission is applied over the manifest in force. An unmentioned field keeps
+          its value; a field set to <code>null</code> is cleared.</td>
+      </tr>
+      <tr>
+        <td><strong>Unknown fields are refused</strong></td>
+        <td class="dim"><code>{"verison": "2.0.0"}</code> gets a <code>422</code>. Silently accepting a
+          typo would say the update landed when it had not — and, because a submission retires the one
+          before it, a real update awaiting review would be thrown away by that typo.</td>
+      </tr>
+      <tr>
+        <td><strong>One at a time</strong></td>
+        <td class="dim">Sending another replaces the one awaiting review. That is changing your mind,
+          not queueing a second review.</td>
+      </tr>
+      <tr>
+        <td><strong>Under 10,000 characters</strong></td>
+        <td class="dim">Counted on the JSON form of what is sent, and again on what it resolves to.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <details class="log">
+    <summary>try the refusals</summary>
+    <table>
+      <tbody>
+        <tr><td class="mono">{"verison": "2.0.0"}</td><td class="dim">422 — unknown field, refused not ignored</td></tr>
+        <tr><td class="mono">{"health_url": "http://localhost:8099/healthz"}</td><td class="dim">422 — not https, and not a public address</td></tr>
+        <tr><td class="mono">{"turn_timeout_seconds": 5}</td><td class="dim">422 — below the 30s floor</td></tr>
+        <tr><td class="mono">{"description": null}</td><td class="dim">202 — null clears the field</td></tr>
+      </tbody>
+    </table>
+  </details>
+</div>
+
+{% endblock %}

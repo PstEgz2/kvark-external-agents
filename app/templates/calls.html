@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Calls · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+<div class="panel">
+  <h2>Every gateway call this process has made</h2>
+  <p class="hint">
+    In memory, newest first, capped at 300. The <code>reason</code> column is the machine-readable one —
+    branch on it, never on the message text.
+  </p>
+  <form method="post" action="/calls/clear"><button class="quiet" type="submit">Clear</button></form>
+
+  <table class="calls" style="margin-top:14px">
+    <thead>
+      <tr><th>time</th><th>status</th><th>call</th><th>reason</th><th>ms</th><th>note</th></tr>
+    </thead>
+    <tbody>
+    {% for call in all_calls %}
+      <tr>
+        <td class="faint">{{ call.at.strftime('%H:%M:%S') }}</td>
+        <td class="{{ 'st-ok' if call.ok else 'st-bad' }}">{{ call.status if call.status is not none else '—' }}</td>
+        <td>{{ call.method }} {{ call.path }}</td>
+        <td class="reason">{{ call.reason or '' }}</td>
+        <td class="faint">{{ call.ms }}</td>
+        <td class="faint">{{ call.note }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="dim">Nothing yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

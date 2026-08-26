@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Documents · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+<div class="panel">
+  <h2>Read a document</h2>
+  <p class="hint">
+    <code>POST /preview</code> for pages of text, <code>POST /preview/messages</code> for a Slack,
+    Discord or Teams conversation. A document that is not a conversation answers 404 on the second —
+    the shapes genuinely differ, so they are separate endpoints rather than one with a flag.
+  </p>
+  <form method="get" action="/documents" class="row">
+    <div class="field" style="max-width:200px">
+      <label for="document_id">document_id</label>
+      <input type="number" id="document_id" name="document_id" value="{{ document_id or '' }}" required>
+    </div>
+    <div class="field" style="max-width:220px">
+      <label for="mode">endpoint</label>
+      <select id="mode" name="mode">
+        <option value="pages" {{ 'selected' if mode != 'messages' }}>/preview — pages</option>
+        <option value="messages" {{ 'selected' if mode == 'messages' }}>/preview/messages — conversation</option>
+      </select>
+    </div>
+    <button class="primary" type="submit">Read</button>
+  </form>
+</div>
+
+{% if document %}
+  <div class="panel">
+    <h2>{{ document.title or document.filename or ('document ' ~ document.document_id) }}</h2>
+    <dl class="kv">
+      <dt>document_id</dt><dd>{{ document.document_id }}</dd>
+      {% if document.total_pages is defined %}<dt>total_pages</dt><dd>{{ document.total_pages }}</dd>{% endif %}
+      {% if document.file_type %}<dt>file_type</dt><dd>{{ document.file_type }}</dd>{% endif %}
+      {% if document.source %}<dt>source</dt><dd>{{ document.source }}</dd>{% endif %}
+      {% if document.languages %}<dt>languages</dt><dd>{{ document.languages | join(', ') }}</dd>{% endif %}
+    </dl>
+
+    {% if document.content %}
+      <p class="hint" style="margin-top:16px">
+        Page image URLs in this response are presigned and expire <strong>one hour</strong> after it was
+        generated. Caching the response and reusing them later yields dead links.
+      </p>
+      {% for page in document.content[:20] %}
+        <details class="log">
+          <summary>page {{ page.page_number }}{% if page.image_url %} · has image{% endif %}</summary>
+          <pre class="out">{{ page.text_content or '(no text on this page)' }}</pre>
+        </details>
+      {% endfor %}
+      {% if document.content | length > 20 %}
+        <p class="faint">{{ document.content | length - 20 }} further pages not listed.</p>
+      {% endif %}
+    {% endif %}
+
+    <details class="log">
+      <summary>raw response</summary>
+      <pre class="out">{{ document | tojson(indent=2) }}</pre>
+    </details>
+  </div>
+{% endif %}
+
+<div class="panel">
+  <h2>Signed URL for one page image</h2>
+  <p class="hint">
+    <code>POST /preview/page</code>. Permission is checked before the URL is minted, never after — a
+    presigned URL carries no authentication of its own, so anyone holding it can fetch the image.
+  </p>
+  <form method="post" action="/documents/page" class="row">
+    <div class="field" style="max-width:200px">
+      <label for="pdoc">document_id</label>
+      <input type="number" id="pdoc" name="document_id" value="{{ document_id or '' }}" required>
+    </div>
+    <div class="field" style="max-width:160px">
+      <label for="pnum">page_number</label>
+      <input type="number" id="pnum" name="page_number" value="1" min="1" required>
+    </div>
+    <button type="submit">Get URL</button>
+  </form>
+
+  {% if image %}
+    <dl class="kv" style="margin-top:16px">
+      <dt>page_number</dt><dd>{{ image.page_number }}</dd>
+      <dt>image_url</dt><dd><a href="{{ image.image_url }}" target="_blank" rel="noopener">{{ image.image_url[:120] }}…</a></dd>
+    </dl>
+  {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Chat · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+<div class="panel">
+  <h2>Ask a question</h2>
+  <p class="hint">
+    Turns are asynchronous: <code>POST /chat/turns</code> answers <code>202</code> with a handle, and
+    this page then polls <code>GET /chat/turns/{id}</code> every {{ settings.poll_seconds }}s until it
+    settles. <code>failed</code> is terminal — ask again rather than polling on.
+  </p>
+
+  <div class="field">
+    <label for="message">message — up to 50,000 characters</label>
+    <textarea id="message" rows="3" placeholder="What did our 2025 assessment conclude about water use?"></textarea>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label for="session">session_id — continue a thread this agent started</label>
+      <input type="text" id="session" placeholder="new conversation">
+    </div>
+    <div class="field">
+      <label for="board">context_board_id — scope to one board</label>
+      <input type="text" id="board" placeholder="none">
+    </div>
+    <div class="field">
+      <label for="docs">selected_document_ids — scope to documents</label>
+      <input type="text" id="docs" placeholder="e.g. 907, 912">
+    </div>
+    <button class="primary" id="ask">Ask</button>
+  </div>
+  <p class="hint" style="margin-top:10px">
+    A board and an explicit document list cannot be combined — the gateway refuses rather than
+    silently preferring one, because nothing in the answer would say which scope had been used.
+  </p>
+</div>
+
+<div class="panel" id="turnpanel" style="display:none">
+  <h2>Turn</h2>
+  <div class="turnstate" id="turnstate"></div>
+  <div class="answer" id="answer" style="display:none"></div>
+  <div id="sources"></div>
+</div>
+
+<div class="panel">
+  <h2>Whole-surface smoke run</h2>
+  <p class="hint">
+    Calls every endpoint once and reports what each answered. It asserts nothing — it is the fastest
+    way to see which parts of the surface this agent has actually been granted.
+  </p>
+  <button id="smoke">Run it</button>
+  <pre class="out" id="smokeout" style="display:none;margin-top:12px"></pre>
+</div>
+
+<script>
+const POLL_MS = {{ (settings.poll_seconds * 1000) | int }};
+let sessionId = null;
+
+const el = (id) => document.getElementById(id);
+
+function renderRefusal(error) {
+  el("turnstate").innerHTML =
+    '<span style="color:var(--bad)">' + (error.status || "") + " " + error.reason + "</span> — " +
+    error.detail + (error.guidance ? '<br><span class="faint">' + error.guidance + "</span>" : "");
+}
+
+async function poll(turnId, startedAt) {
+  const response = await fetch("/api/chat/turn/" + turnId);
+  const body = await response.json();
+  if (body.error) { renderRefusal(body.error); return; }
+
+  const seconds = Math.round((Date.now() - startedAt) / 1000);
+  if (body.status === "running") {
+    el("turnstate").innerHTML =
+      '<span class="dot">●</span> running — turn ' + turnId + ", session " + body.session_id + " · " + seconds + "s";
+    setTimeout(() => poll(turnId, startedAt), POLL_MS);
+    return;
+  }
+  if (body.status === "failed") {
+    el("turnstate").innerHTML =
+      '<span style="color:var(--bad)">failed</span> after ' + seconds +
+      "s — terminal. Ask again; do not keep polling.";
+    return;
+  }
+  el("turnstate").innerHTML = '<span style="color:var(--ok)">done</span> in ' + seconds + "s · session " + body.session_id;
+  el("answer").style.display = "block";
+  el("answer").textContent = body.answer || "(the answer was empty)";
+  const sources = body.sources || [];
+  el("sources").innerHTML = sources.length
+    ? '<details class="log"><summary>' + sources.length + " source(s)</summary><pre class=\"out\">" +
+      JSON.stringify(sources, null, 2).replace(/</g, "&lt;") + "</pre></details>"
+    : '<p class="faint" style="margin-top:10px">The answer cited nothing.</p>';
+}
+
+el("ask").addEventListener("click", async () => {
+  const message = el("message").value.trim();
+  if (!message) return;
+
+  el("turnpanel").style.display = "block";
+  el("answer").style.display = "none";
+  el("sources").innerHTML = "";
+  el("turnstate").textContent = "sending…";
+
+  const payload = { message };
+  const session = el("session").value.trim() || sessionId;
+  if (session) payload.session_id = parseInt(session, 10);
+  if (el("board").value.trim()) payload.context_board_id = parseInt(el("board").value.trim(), 10);
+  if (el("docs").value.trim()) payload.selected_document_ids = el("docs").value.trim();
+
+  const response = await fetch("/api/chat/ask", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+  });
+  const body = await response.json();
+  if (body.error) { renderRefusal(body.error); return; }
+
+  sessionId = body.session_id;
+  el("session").value = body.session_id;
+  let head = "202 accepted — turn " + body.turn_id + ", session " + body.session_id;
+  if (body.scope_truncated) head += " · scope truncated: the answer reads part of what was asked for";
+  el("turnstate").textContent = head;
+  poll(body.turn_id, Date.now());
+});
+
+el("smoke").addEventListener("click", async () => {
+  el("smokeout").style.display = "block";
+  el("smokeout").textContent = "running…";
+  const response = await fetch("/api/smoke", { method: "POST" });
+  el("smokeout").textContent = JSON.stringify(await response.json(), null, 2);
+});
+</script>
+
+{% endblock %}

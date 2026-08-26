@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Boards · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+<div class="panel">
+  <h2>Context boards</h2>
+  <p class="hint">
+    The boards this person can reach. <code>item_count</code> counts everything on the board — including
+    items this person cannot read and web links, neither of which a question can be answered from.
+  </p>
+
+  {% if boards is defined %}
+    {% if boards %}
+      <table>
+        <thead><tr><th class="mono">id</th><th>name</th><th class="mono">item_count</th><th></th></tr></thead>
+        <tbody>
+        {% for board in boards %}
+          <tr>
+            <td class="mono">{{ board.id }}</td>
+            <td>{{ board.name }}</td>
+            <td class="mono">{{ board.item_count }}</td>
+            <td><a href="/boards?board_id={{ board.id }}">what a question would read →</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="dim">This person has no context boards.</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+{% if scope %}
+  <div class="panel">
+    <h2>Board {{ scope.board_id }} — the actual scope</h2>
+    <p class="hint">
+      Exactly what a turn scoped to this board would read. Resolved against this person's own
+      permissions, so it is the readable subset — never the whole board.
+    </p>
+    <dl class="kv">
+      <dt>documents in scope</dt><dd>{{ scope.documents | length }}</dd>
+      <dt>withheld</dt><dd>{{ scope.withheld }} <span class="faint">— on the board, not readable by this person</span></dd>
+      <dt>web_links</dt><dd>{{ scope.web_links }} <span class="faint">— a chat turn cannot read them</span></dd>
+      <dt>truncated</dt><dd>{{ scope.truncated }}{% if scope.truncated %} <span class="faint">— more readable documents than one question can carry</span>{% endif %}</dd>
+    </dl>
+
+    {% if scope.documents %}
+      <table style="margin-top:16px">
+        <thead><tr><th class="mono">document_id</th><th>title</th><th></th></tr></thead>
+        <tbody>
+        {% for document in scope.documents %}
+          <tr>
+            <td class="mono">{{ document.document_id }}</td>
+            <td>{{ document.title or '—' }}</td>
+            <td><a href="/documents?document_id={{ document.document_id }}">read →</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p style="margin-top:14px">
+        <a class="btn" href="/chat">Ask a question scoped to board {{ scope.board_id }} →</a>
+        <span class="faint" style="margin-left:8px">put {{ scope.board_id }} in <code>context_board_id</code></span>
+      </p>
+    {% else %}
+      <p class="dim">
+        Nothing on this board is readable by this person. A board-scoped question is refused rather than
+        widened to the whole corpus.
+      </p>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% endblock %}

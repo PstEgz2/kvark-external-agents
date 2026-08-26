@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Search · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+<div class="panel">
+  <h2>Search the knowledge base</h2>
+  <p class="hint">
+    Hybrid search, scoped to what the signed-in person may read — this agent never sees more than the
+    human it acts for. An empty query browses the whole readable corpus by recency.
+  </p>
+  <form method="get" action="/search" class="row">
+    <div class="field">
+      <label for="q">q</label>
+      <input type="text" id="q" name="q" value="{{ q }}" placeholder="environmental risk assessment">
+    </div>
+    <div class="field" style="max-width:120px">
+      <label for="limit">limit</label>
+      <input type="number" id="limit" name="limit" value="{{ limit }}" min="1" max="100">
+    </div>
+    <button class="primary" type="submit">Search</button>
+  </form>
+</div>
+
+{% if results %}
+  <div class="panel">
+    <h2>{{ results.results | length }} of about {{ results.approx_total }}</h2>
+    {% if results.results %}
+      <table>
+        <thead>
+          <tr><th class="mono">id</th><th>title</th><th>snippet</th><th class="mono">score</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for hit in results.results %}
+          <tr>
+            <td class="mono">{{ hit.document_id }}</td>
+            <td>
+              {{ hit.title or hit.filename or '—' }}
+              <div class="faint">{{ hit.file_type or '' }}{% if hit.page_count %} · {{ hit.page_count }} pages{% endif %}{% if hit.source %} · {{ hit.source }}{% endif %}</div>
+            </td>
+            <td class="dim">{{ (hit.snippet or '')[:220] }}</td>
+            <td class="mono">{{ '%.3f' % hit.score }}</td>
+            <td>
+              <a href="/documents?document_id={{ hit.document_id }}{% if hit.is_message %}&mode=messages{% endif %}">read →</a>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+
+      {% if results.next_cursor %}
+        <p style="margin-top:14px">
+          <a class="btn" href="/search?q={{ q | urlencode }}&limit={{ limit }}&cursor={{ results.next_cursor | urlencode }}">Next page →</a>
+          <span class="faint" style="margin-left:10px">
+            The cursor is bound to this query. Reusing it with a different one answers 400 rather than
+            quietly paging through something else.
+          </span>
+        </p>
+      {% else %}
+        <p class="faint" style="margin-top:14px">No next cursor — this is the last page.</p>
+      {% endif %}
+    {% else %}
+      <p class="dim">Nothing matched, or nothing in the corpus is readable by this person.</p>
+    {% endif %}
+
+    <details class="log">
+      <summary>raw response</summary>
+      <pre class="out">{{ results | tojson(indent=2) }}</pre>
+    </details>
+  </div>
+{% endif %}
+
+{% endblock %}

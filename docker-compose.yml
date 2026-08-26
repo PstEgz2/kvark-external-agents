@@ -1,0 +1,30 @@
+name: kvark-external-agent
+
+services:
+  agent:
+    build: .
+    container_name: kvark-external-agent
+    ports:
+      - "8099:8099"
+    environment:
+      # KVARK's compose runs with `network_mode: host`, so from inside this container the
+      # gateway is on the Docker host rather than on `localhost`. `host-gateway` below is
+      # what makes that name resolve on Linux; Docker Desktop provides it anyway.
+      KVARK_GATEWAY_BASE: ${KVARK_GATEWAY_BASE:-http://host.docker.internal:8010/agent-api/v1}
+      KVARK_API_BASE: ${KVARK_API_BASE:-http://host.docker.internal:8008/api}
+      AGENT_NAME: ${AGENT_NAME:-Egzakta Console}
+      AGENT_VERSION: ${AGENT_VERSION:-1.0.0}
+      # Left empty on purpose for a local run: KVARK refuses to probe an address that is not
+      # https and globally routable, so a local agent is never health-checked. Set it only
+      # when a public tunnel is in front of this container.
+      AGENT_HEALTH_URL: ${AGENT_HEALTH_URL:-}
+      AGENT_POLL_SECONDS: ${AGENT_POLL_SECONDS:-2}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # The API key is shown once. This is the only copy.
+      - agent-state:/data
+    restart: unless-stopped
+
+volumes:
+  agent-state:

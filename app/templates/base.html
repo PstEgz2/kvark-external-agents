@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}KVARK External Agent{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="shell">
+    <div class="brand">
+      <h1>KVARK External Agent</h1>
+      {% if agent %}
+        <span class="pill">{{ agent.slug }}</span>
+        <span class="pill">key {{ agent.key_prefix }}…</span>
+      {% else %}
+        <span class="pill warn">not registered</span>
+      {% endif %}
+      <span class="spacer"></span>
+      {% if identity %}
+        <span class="who">acting for {{ identity.label }} · token {{ identity.expires_in }} left</span>
+        <form method="post" action="/logout" style="display:inline">
+          <button class="quiet" type="submit">sign out</button>
+        </form>
+      {% else %}
+        <span class="who">nobody signed in</span>
+      {% endif %}
+    </div>
+
+    <nav class="tabs">
+      {% set here = request.url.path %}
+      <a href="/setup"     class="{{ 'on' if here == '/setup' }}">Agent</a>
+      <a href="/manifest"  class="{{ 'on' if here == '/manifest' }}">Manifest</a>
+      <a href="/chat"      class="{{ 'on' if here == '/chat' }}">Chat</a>
+      <a href="/search"    class="{{ 'on' if here == '/search' }}">Search</a>
+      <a href="/documents" class="{{ 'on' if here == '/documents' }}">Documents</a>
+      <a href="/boards"    class="{{ 'on' if here == '/boards' }}">Boards</a>
+      <a href="/tools"     class="{{ 'on' if here == '/tools' }}">Tools</a>
+      <a href="/calls"     class="{{ 'on' if here == '/calls' }}">Calls</a>
+      {% if not identity %}<a href="/login" class="{{ 'on' if here == '/login' }}">Sign in</a>{% endif %}
+    </nav>
+  </div>
+</header>
+
+<div class="shell">
+
+  {% if error %}
+    <div class="refusal">
+      <div class="head">{{ error.status }} {{ error.reason }}{% if not error.retryable %} · not retryable{% endif %}</div>
+      <div class="detail">{{ error.detail }}</div>
+      {% if error.guidance %}<div class="guidance">{{ error.guidance }}</div>{% endif %}
+    </div>
+  {% endif %}
+
+  {% if form_error %}
+    <div class="warnbox"><div class="head">not sent</div>{{ form_error }}</div>
+  {% endif %}
+
+  {% block body %}{% endblock %}
+
+  {% if calls and all_calls is not defined %}
+    <details class="log">
+      <summary>Last {{ calls|length }} gateway calls</summary>
+      <table class="calls">
+        <tbody>
+        {% for call in calls[:12] %}
+          <tr>
+            <td class="faint">{{ call.at.strftime('%H:%M:%S') }}</td>
+            <td class="{{ 'st-ok' if call.ok else 'st-bad' }}">{{ call.status if call.status is not none else '—' }}</td>
+            <td>{{ call.method }} {{ call.path }}</td>
+            <td class="reason">{{ call.reason or '' }}</td>
+            <td class="faint">{{ call.ms }}ms</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p><a href="/calls">the full log →</a></p>
+    </details>
+  {% endif %}
+
+</div>
+</body>
+</html>

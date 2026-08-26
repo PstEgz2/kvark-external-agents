@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Agent · KVARK External Agent{% endblock %}
+
+{% block body %}
+
+{% if agent %}
+
+  <div class="panel">
+    <h2>This agent</h2>
+    <p class="hint">
+      Registration succeeded. The key below is the only copy that exists — KVARK keeps a hash.
+    </p>
+    <dl class="kv">
+      <dt>agent_id</dt><dd>{{ agent.agent_id }}</dd>
+      <dt>slug</dt><dd>{{ agent.slug }} <span class="faint">— permanent; a rename means a new registration</span></dd>
+      <dt>key_prefix</dt><dd>{{ agent.key_prefix }}</dd>
+      <dt>api_key</dt><dd>{{ agent.api_key }}</dd>
+      <dt>status at registration</dt><dd>{{ agent.status_at_registration }}</dd>
+      <dt>gateway</dt><dd>{{ settings.gateway_base }}</dd>
+      <dt>state file</dt><dd>{{ settings.state_path }}</dd>
+    </dl>
+  </div>
+
+  <div class="panel">
+    <h2>What happens next</h2>
+    <p class="hint">
+      The key works from the moment it is issued; approval is what makes KVARK honour it. Until an
+      administrator approves this agent every call answers <code>403 agent_pending_approval</code>,
+      which is not transient — polling will not make it approve sooner.
+    </p>
+    <table>
+      <tbody>
+        <tr>
+          <td class="dim">1</td>
+          <td>An administrator approves the agent and ticks the capabilities it may have
+              <span class="faint">— Settings → Agents in KVARK, or <code>POST /api/external-agents/{{ agent.agent_id }}/approve</code></span></td>
+        </tr>
+        <tr>
+          <td class="dim">2</td>
+          <td>They add <code>feature-external-agent-{{ agent.slug }}</code> to the role of everyone allowed to use it
+              <span class="faint">— the roles page. Approval alone is not enough; without this every call is <code>403 user_not_permitted</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="dim">3</td>
+          <td>Sign a person in here, then drive the tabs above</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>Manifest as submitted</h2>
+    <pre class="out">{{ agent.manifest | tojson(indent=2) }}</pre>
+    {% if agent.submissions %}
+      <h2 style="margin-top:18px">Updates sent since</h2>
+      <p class="hint">Recorded locally as <em>submitted</em>. What is in force is whatever an administrator last approved.</p>
+      <table>
+        <thead><tr><th>when</th><th>version row</th><th>status</th><th>changelog</th></tr></thead>
+        <tbody>
+        {% for entry in agent.submissions | reverse %}
+          <tr>
+            <td class="mono">{{ entry.at }}</td>
+            <td class="mono">{{ entry.manifest_version_id }}</td>
+            <td class="mono">{{ entry.status }}</td>
+            <td>{{ entry.changelog or '—' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h2>Forget this registration</h2>
+    <p class="hint">
+      Drops our copy of the key. The agent row stays in KVARK and the slug stays taken, so
+      registering again needs a different name. There is no way to recover a forgotten key.
+    </p>
+    <form method="post" action="/setup/forget"
+          onsubmit="return confirm('Forget the key? It cannot be recovered.')">
+      <button type="submit">Forget</button>
+    </form>
+  </div>
+
+{% else %}
+
+  <div class="panel">
+    <h2>Register</h2>
+    <p class="hint">
+      One call, no credentials — it is where credentials come from. Everything requested here is a
+      <em>request</em>: an administrator decides what this agent actually receives, and may give it less.
+    </p>
+
+    <form method="post" action="/setup">
+      <div class="row">
+        <div class="field">
+          <label for="name">name — becomes the permanent slug</label>
+          <input type="text" id="name" name="name" required
+                 value="{{ submitted.name if submitted else settings.agent_name }}">
+        </div>
+        <div class="field" style="max-width:160px">
+          <label for="version">version</label>
+          <input type="text" id="version" name="version"
+                 value="{{ submitted.version if submitted else settings.agent_version }}">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="description">description — what the administrator reads before approving</label>
+        <input type="text" id="description" name="description"
+               value="{{ submitted.description if submitted else 'A console that exercises every endpoint the KVARK agent gateway publishes.' }}">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="publisher">publisher</label>
+          <input type="text" id="publisher" name="publisher" value="{{ submitted.publisher if submitted else 'Egzakta' }}">
+        </div>
+        <div class="field">
+          <label for="contact">contact</label>
+          <input type="text" id="contact" name="contact" value="{{ submitted.contact if submitted else '' }}">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="base_url">base_url — where this agent lives, recorded only</label>
+        <input type="text" id="base_url" name="base_url" value="{{ submitted.base_url if submitted else '' }}">
+      </div>
+
+      <div class="field">
+        <label for="health_url">health_url — the one address KVARK calls out to</label>
+        <input type="text" id="health_url" name="health_url" value="{{ submitted.health_url if submitted else settings.health_url }}">
+        <p class="hint" style="margin-top:6px">
+          Must be <strong>https</strong> and must resolve to a <strong>public</strong> address — checked at
+          registration and again before every probe. A locally-run agent has neither, so leave this empty
+          unless a tunnel is in front of it. Empty means never health-checked, which is not an error.
+        </p>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="requested_features">requested_features — comma separated</label>
+          <input type="text" id="requested_features" name="requested_features"
+                 value="feature-chat, feature-search, feature-context-board">
+        </div>
+        <div class="field" style="max-width:180px">
+          <label for="turn_timeout_seconds">turn_timeout_seconds</label>
+          <input type="text" id="turn_timeout_seconds" name="turn_timeout_seconds" value="">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="requested_tools">requested_tools — comma separated</label>
+        <input type="text" id="requested_tools" name="requested_tools"
+               value="search_knowledge_base, search_within_document, get_page, get_document_outline, list_document_versions, filter_documents">
+        <p class="hint" style="margin-top:6px">
+          Those six are the externally-callable set on this build. Naming one that does not exist is not
+          refused here — it simply cannot be granted.
+        </p>
+      </div>
+
+      <button class="primary" type="submit">Register</button>
+    </form>
+  </div>
+
+  <div class="warnbox">
+    <div class="head">before you press it</div>
+    The name becomes the slug and the slug is forever. If this deployment already holds an agent by that
+    name the answer is <code>409 registration_conflict</code> and you pick another.
+  </div>
+
+{% endif %}
+
+{% endblock %}
