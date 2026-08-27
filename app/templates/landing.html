@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ settings.agent_name }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="shell">
+    <div class="brand">
+      <h1>{{ settings.agent_name }}</h1>
+      <span class="pill">v{{ settings.agent_version }}</span>
+      {% if agent %}<span class="pill">{{ agent.slug }}</span>{% endif %}
+      <span class="spacer"></span>
+      <span class="who">{{ settings.agent_publisher }}</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+
+  <div class="panel">
+    <h2>What this is</h2>
+    <p class="hint" style="font-size:14px;color:var(--ink)">{{ settings.agent_description }}</p>
+    <dl class="kv" style="margin-top:16px">
+      <dt>publisher</dt><dd>{{ settings.agent_publisher }}</dd>
+      <dt>contact</dt><dd>{{ settings.agent_contact }}</dd>
+      <dt>gateway</dt><dd>{{ settings.gateway_base }}</dd>
+      {% if agent %}<dt>registered as</dt><dd>{{ agent.slug }} (agent {{ agent.agent_id }})</dd>{% endif %}
+    </dl>
+    <p style="margin-top:18px">
+      <a class="btn" href="/chat">Open the console →</a>
+      <a class="btn" href="/manifest.json">Manifest as JSON</a>
+      <a class="btn" href="/healthz">Health</a>
+    </p>
+    <p class="hint" style="margin-top:12px">
+      This page is the address given to KVARK as <code>base_url</code>. It is deliberately
+      public and says nothing an unauthenticated reader should not see — the console behind it
+      is where anything actually happens, and it acts only for a signed-in person.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h2>What it asks KVARK for</h2>
+    <p class="hint">A request, not a grant. An administrator decides what it actually receives, and may give it less.</p>
+    <table>
+      <thead><tr><th>Features</th><th>Tools</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono dim">
+            {% for feature in settings.requested_features %}{{ feature }}<br>{% endfor %}
+          </td>
+          <td class="mono dim">
+            {% for tool in settings.requested_tools %}{{ tool }}<br>{% endfor %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>Health</h2>
+    {% if settings.health_url %}
+      <dl class="kv">
+        <dt>health_url</dt><dd>{{ settings.health_url }}</dd>
+      </dl>
+      <p class="hint" style="margin-top:12px">
+        KVARK polls this on an interval and shows the result to administrators. Any 2xx means
+        healthy; a redirect reads as unhealthy because redirects are not followed.
+      </p>
+    {% else %}
+      <p class="dim">
+        No <code>health_url</code> declared, so KVARK never probes this agent — which is not an
+        error, just silence on the admin page.
+      </p>
+      <p class="hint">
+        KVARK will only call an address that is <strong>https</strong> and resolves to a
+        <strong>public</strong> address, checked again before every probe. A locally-run agent is
+        neither, so declaring one means putting a public tunnel in front of
+        <code>{{ settings.base_url }}</code> and setting <code>AGENT_HEALTH_URL</code> to
+        <code>https://&lt;tunnel&gt;/healthz</code>.
+      </p>
+    {% endif %}
+  </div>
+
+</div>
+</body>
+</html>

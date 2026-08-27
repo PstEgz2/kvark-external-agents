@@ -1,0 +1,23 @@
+{
+  "name": "Egzakta Procurement",
+  "version": "1.0.0",
+  "description": "Operator console for the KVARK agent gateway. Exercises every published endpoint on behalf of a signed-in person and shows the raw status and refusal reason for each call. Reads only; it never writes back to KVARK.",
+  "publisher": "Egzakta",
+  "contact": "integrations@example.com",
+  "base_url": "http://localhost:8099",
+  "requested_features": [
+    "feature-chat",
+    "feature-search",
+    "feature-context-board"
+  ],
+  "requested_tools": [
+    "search_knowledge_base",
+    "search_within_document",
+    "get_page",
+    "get_document_outline",
+    "list_document_versions",
+    "filter_documents"
+  ],
+  "health_url": "https://example.com/",
+  "turn_timeout_seconds": 120
+}

@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.config import settings
+from app.config import declared_manifest, settings
 from app.identity import Identity, IdentityError, sign_in, token_expiry
 from app.kvark import Gateway, GatewayError, call_log
 from app.store import AgentIdentity, Store
@@ -142,17 +142,30 @@ async def healthz() -> JSONResponse:
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
-    agent = store.load()
-    if agent is None:
-        return RedirectResponse("/setup", status_code=303)
-    if _identity(request) is None:
-        return RedirectResponse("/login", status_code=303)
-    return RedirectResponse("/chat", status_code=303)
+    """The address given to KVARK as `base_url`.
+
+    Public, and deliberately thin: an administrator following the link from the agent's page
+    in KVARK should learn who runs this agent and what it asks for, and nothing else. Every
+    operator route is behind it and acts only for a signed-in person.
+    """
+    return templates.TemplateResponse(
+        request, "landing.html", {"settings": settings, "agent": store.load()}
+    )
+
+
+@app.get("/manifest.json")
+async def manifest_json() -> JSONResponse:
+    """The manifest this agent would register with, built from its live configuration.
+
+    Served rather than kept in a file beside the code, so what an administrator reviews and
+    what the application actually is cannot drift apart.
+    """
+    return JSONResponse(declared_manifest())
 
 
 @app.get("/setup", response_class=HTMLResponse)
 async def setup(request: Request) -> HTMLResponse:
-    return _page(request, "setup.html")
+    return _page(request, "setup.html", declared=declared_manifest())
 
 
 @app.post("/setup", response_class=HTMLResponse)
@@ -185,14 +198,19 @@ async def do_register(
         try:
             manifest["turn_timeout_seconds"] = int(turn_timeout_seconds)
         except ValueError:
-            return _page(request, "setup.html", form_error="turn_timeout_seconds must be a whole number of seconds.")
+            return _page(
+                request,
+                "setup.html",
+                declared=declared_manifest(),
+                form_error="turn_timeout_seconds must be a whole number of seconds.",
+            )
     manifest["requested_features"] = [item.strip() for item in requested_features.split(",") if item.strip()]
     manifest["requested_tools"] = [item.strip() for item in requested_tools.split(",") if item.strip()]
 
     try:
         receipt = await gateway.register(manifest)
     except GatewayError as refusal:
-        return _page(request, "setup.html", submitted=manifest, **_refusal_context(refusal))
+        return _page(request, "setup.html", declared=declared_manifest(), submitted=manifest, **_refusal_context(refusal))
 
     store.save(
         AgentIdentity(

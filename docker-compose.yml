@@ -12,12 +12,27 @@ services:
       # what makes that name resolve on Linux; Docker Desktop provides it anyway.
       KVARK_GATEWAY_BASE: ${KVARK_GATEWAY_BASE:-http://host.docker.internal:8010/agent-api/v1}
       KVARK_API_BASE: ${KVARK_API_BASE:-http://host.docker.internal:8008/api}
+      # The slug derived from AGENT_NAME is permanent, so a clean walkthrough needs a name
+      # that has not been used on this deployment before.
       AGENT_NAME: ${AGENT_NAME:-Egzakta Console}
       AGENT_VERSION: ${AGENT_VERSION:-1.0.0}
+      AGENT_PUBLISHER: ${AGENT_PUBLISHER:-Egzakta}
+      # Whoever operates this agent. Set it in .env; the default is a placeholder so a
+      # clone of this repository does not point its registrations at somebody else.
+      AGENT_CONTACT: ${AGENT_CONTACT:-integrations@example.com}
+      # What an administrator is sent to from the agent's page in KVARK. Point it at the
+      # tunnel rather than localhost when one is up, or the link goes nowhere for them.
+      AGENT_BASE_URL: ${AGENT_BASE_URL:-http://localhost:8099}
       # Left empty on purpose for a local run: KVARK refuses to probe an address that is not
       # https and globally routable, so a local agent is never health-checked. Set it only
       # when a public tunnel is in front of this container.
       AGENT_HEALTH_URL: ${AGENT_HEALTH_URL:-}
+      # Omitted from the manifest when zero, which is the right answer for most agents:
+      # it can only ever narrow KVARK's own budget, never extend it.
+      AGENT_TURN_TIMEOUT_SECONDS: ${AGENT_TURN_TIMEOUT_SECONDS:-0}
+      AGENT_DESCRIPTION: ${AGENT_DESCRIPTION:-}
+      AGENT_REQUESTED_FEATURES: ${AGENT_REQUESTED_FEATURES:-}
+      AGENT_REQUESTED_TOOLS: ${AGENT_REQUESTED_TOOLS:-}
       AGENT_POLL_SECONDS: ${AGENT_POLL_SECONDS:-2}
     extra_hosts:
       - "host.docker.internal:host-gateway"

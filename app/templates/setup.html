@@ -96,40 +96,40 @@
         <div class="field">
           <label for="name">name — becomes the permanent slug</label>
           <input type="text" id="name" name="name" required
-                 value="{{ submitted.name if submitted else settings.agent_name }}">
+                 value="{{ submitted.name if submitted else declared.name }}">
         </div>
         <div class="field" style="max-width:160px">
           <label for="version">version</label>
           <input type="text" id="version" name="version"
-                 value="{{ submitted.version if submitted else settings.agent_version }}">
+                 value="{{ submitted.version if submitted else declared.version }}">
         </div>
       </div>
 
       <div class="field">
         <label for="description">description — what the administrator reads before approving</label>
         <input type="text" id="description" name="description"
-               value="{{ submitted.description if submitted else 'A console that exercises every endpoint the KVARK agent gateway publishes.' }}">
+               value="{{ submitted.description if submitted else declared.description }}">
       </div>
 
       <div class="row">
         <div class="field">
           <label for="publisher">publisher</label>
-          <input type="text" id="publisher" name="publisher" value="{{ submitted.publisher if submitted else 'Egzakta' }}">
+          <input type="text" id="publisher" name="publisher" value="{{ submitted.publisher if submitted else declared.publisher }}">
         </div>
         <div class="field">
           <label for="contact">contact</label>
-          <input type="text" id="contact" name="contact" value="{{ submitted.contact if submitted else '' }}">
+          <input type="text" id="contact" name="contact" value="{{ submitted.contact if submitted else declared.contact }}">
         </div>
       </div>
 
       <div class="field">
         <label for="base_url">base_url — where this agent lives, recorded only</label>
-        <input type="text" id="base_url" name="base_url" value="{{ submitted.base_url if submitted else '' }}">
+        <input type="text" id="base_url" name="base_url" value="{{ submitted.base_url if submitted else declared.base_url }}">
       </div>
 
       <div class="field">
         <label for="health_url">health_url — the one address KVARK calls out to</label>
-        <input type="text" id="health_url" name="health_url" value="{{ submitted.health_url if submitted else settings.health_url }}">
+        <input type="text" id="health_url" name="health_url" value="{{ submitted.health_url if submitted else declared.get('health_url', '') }}">
         <p class="hint" style="margin-top:6px">
           Must be <strong>https</strong> and must resolve to a <strong>public</strong> address — checked at
           registration and again before every probe. A locally-run agent has neither, so leave this empty
@@ -141,18 +141,18 @@
         <div class="field">
           <label for="requested_features">requested_features — comma separated</label>
           <input type="text" id="requested_features" name="requested_features"
-                 value="feature-chat, feature-search, feature-context-board">
+                 value="{{ declared.requested_features | join(', ') }}">
         </div>
         <div class="field" style="max-width:180px">
           <label for="turn_timeout_seconds">turn_timeout_seconds</label>
-          <input type="text" id="turn_timeout_seconds" name="turn_timeout_seconds" value="">
+          <input type="text" id="turn_timeout_seconds" name="turn_timeout_seconds" value="{{ declared.get('turn_timeout_seconds', '') }}">
         </div>
       </div>
 
       <div class="field">
         <label for="requested_tools">requested_tools — comma separated</label>
         <input type="text" id="requested_tools" name="requested_tools"
-               value="search_knowledge_base, search_within_document, get_page, get_document_outline, list_document_versions, filter_documents">
+               value="{{ declared.requested_tools | join(', ') }}">
         <p class="hint" style="margin-top:6px">
           Those six are the externally-callable set on this build. Naming one that does not exist is not
           refused here — it simply cannot be granted.
