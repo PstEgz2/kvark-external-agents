@@ -1,15 +1,24 @@
-# KVARK external agent — a console over the agent gateway
+# kvark-external-agents
 
-A partner application that exercises every endpoint KVARK's agent gateway publishes, so the
-gateway can be driven end to end by hand. It is deliberately a *thin* client: nothing here
-interprets an answer or retries around a refusal. Every call goes out as
-`docs/writing-an-external-agent.md` describes it, and whatever comes back is shown —
-including the status and the machine-readable `reason`.
+How to build an application that talks to KVARK's agent gateway — the written guide, and a
+worked example you can run.
 
-That is the point. An integration bug and a gateway bug look different on this screen.
+- **[docs/writing-an-external-agent.md](docs/writing-an-external-agent.md)** — the guide.
+  Registration, acting for a person, asking questions, the refusals and what each one means.
+  Verified against a running gateway rather than written from the source.
+- **This repository** — that guide as working code: a console that exercises every endpoint
+  the gateway publishes, so the whole surface can be driven by hand.
+
+The console is deliberately a *thin* client. Nothing here interprets an answer or retries
+around a refusal. Every call goes out as the guide describes it, and whatever comes back is
+shown — including the status and the machine-readable `reason`. That is the point: an
+integration bug and a gateway bug look different on this screen.
 
 It runs completely separately from KVARK: its own repository, its own container, its own
 port. The only thing it knows about KVARK is where to reach it.
+
+Start with `app/kvark.py` if you are writing your own client — it is one method per
+published endpoint and one error type, and it is the part worth copying.
 
 ---
 
@@ -73,7 +82,18 @@ uvicorn app.main:app --port 8099
    `AGENT_STATE_PATH` and is the only copy that will ever exist.
 2. Every call now answers `403 agent_pending_approval`. That is correct and it is not
    transient.
-3. **Approve** it, as an administrator would:
+3. **Grant the umbrella permission — once per deployment.** `feature-external-agents` ships
+   seeded but assigned to nobody, deliberately, so the agents admin page answers 403 for
+   everyone including the seeded `admin` until:
+
+   ```bash
+   python scripts/kvark_admin.py bootstrap --role Administrator
+   ```
+
+   Read means *act through an agent*, write means *administer them* — this feature is
+   deliberately not single-flag, so both are granted.
+
+4. **Approve** it, as an administrator would:
 
    ```bash
    python scripts/kvark_admin.py list
@@ -82,18 +102,18 @@ uvicorn app.main:app --port 8099
      --tools search_knowledge_base,get_page,get_document_outline
    ```
 
-4. **Put it on a role.** This is the step people miss. Approving creates the agent's catalog
+5. **Put it on a role.** This is the step people miss. Approving creates the agent's catalog
    row but grants it to nobody, so calls answer `403 user_not_permitted` until:
 
    ```bash
-   python scripts/kvark_admin.py permit <slug> --role Admin
+   python scripts/kvark_admin.py permit <slug> --role Administrator
    ```
 
-5. **Sign in** as someone in that role and drive the tabs.
-6. **Submit a manifest update** and watch it stay pending — the agent goes on running what
+6. **Sign in** as someone in that role and drive the tabs.
+7. **Submit a manifest update** and watch it stay pending — the agent goes on running what
    it was approved with. Then `accept`, or `reject`, or `accept` an older version to roll
    back.
-7. **Disable** it and watch the next call answer `403 agent_disabled`.
+8. **Disable** it and watch the next call answer `403 agent_disabled`.
 
 Everything the script does is also on KVARK's Settings → Agents page. The script exists so
 the walkthrough is repeatable, not because the page is missing anything.

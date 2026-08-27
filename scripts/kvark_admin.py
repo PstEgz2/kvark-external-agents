@@ -11,10 +11,11 @@ The step people miss is the third. Approving an agent creates its own catalog ro
 (``feature-external-agent-<slug>``) but grants it to nobody. Until that identifier is on
 somebody's role, every call that agent makes for them answers ``403 user_not_permitted``.
 
+    python scripts/kvark_admin.py bootstrap --role Administrator      # once per deployment
     python scripts/kvark_admin.py list
     python scripts/kvark_admin.py show <agent_id>
     python scripts/kvark_admin.py approve <agent_id> --features feature-chat,feature-search
-    python scripts/kvark_admin.py permit <agent_slug> --role Admin
+    python scripts/kvark_admin.py permit <agent_slug> --role Administrator
     python scripts/kvark_admin.py manifests <agent_id>
     python scripts/kvark_admin.py accept <agent_id> <manifest_id> --features … --tools …
     python scripts/kvark_admin.py reject <agent_id> <manifest_id> --reason "…"
@@ -31,6 +32,14 @@ import sys
 from typing import Any
 
 import httpx
+
+# Windows consoles default to cp1252, which cannot encode the dashes and arrows in the
+# messages below — and an encoding error mid-report loses the report, not just the dash.
+for stream in (sys.stdout, sys.stderr):
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 
 API = os.environ.get("KVARK_API_BASE", "http://localhost:8008/api").rstrip("/")
 USER = os.environ.get("KVARK_ADMIN_USER", "admin")
@@ -130,6 +139,16 @@ def cmd_disable(client: httpx.Client, args: argparse.Namespace) -> None:
     print(f"{detail['slug']} is {detail['status']} — its next call is refused with agent_disabled")
 
 
+def cmd_uninstall(client: httpx.Client, args: argparse.Namespace) -> None:
+    """Remove an agent outright. The slug is *not* released — it stays taken forever.
+
+    The way to clear a pending queue that has hit `registration_capacity`: the caps count
+    rows awaiting a decision, so removing or deciding on what is queued is what frees space.
+    """
+    _call(client, "DELETE", f"/external-agents/{args.agent_id}")
+    print(f"agent {args.agent_id} removed. Its key stops working; its slug stays taken.")
+
+
 def cmd_manifests(client: httpx.Client, args: argparse.Namespace) -> None:
     versions = _call(client, "GET", f"/external-agents/{args.agent_id}/manifests")
     for version in versions:
@@ -161,45 +180,38 @@ def cmd_reject(client: httpx.Client, args: argparse.Namespace) -> None:
     print(f"Rejected. {detail['slug']} goes on running version {detail['approved_version']}.")
 
 
-def cmd_permit(client: httpx.Client, args: argparse.Namespace) -> None:
-    """Put the agent's identifier on a role, alongside what that role already holds.
+def _grant_to_role(client: httpx.Client, role_name: str, readable: set[str], writable: set[str]) -> str:
+    """Add identifiers to a role, keeping everything it already holds.
 
     The roles endpoint *replaces* a role's feature set rather than patching it, so the
     current set has to be read back and re-sent. Sending only the new identifier would
-    strip every other permission the role has — which is a quiet way to lock an
-    organisation out of its own product.
-    """
-    identifier = f"feature-external-agent-{args.agent_slug}"
+    strip every other permission the role has — a quiet way to lock an organisation out of
+    its own product.
 
+    An identifier the catalog does not know is refused here rather than sent, because the
+    endpoint answers 400 for the whole request — and the request is a replacement, so the
+    failure is silent about the fact that nothing changed.
+    """
     catalog = _call(client, "POST", "/permissions/features/list")
     by_id = {item["id"]: item["identifier"] for group in catalog for item in group["items"]}
     known = set(by_id.values())
-    if identifier not in known:
-        raise AdminError(
-            f"{identifier!r} is not in the catalog. Approve the agent first — the row is created then."
-        )
+
+    missing = (readable | writable) - known
+    if missing:
+        raise AdminError(f"Not in the feature catalog: {sorted(missing)}")
 
     roles = _call(client, "POST", "/permissions/roles/list")
-    role = next((item for item in roles if item["name"].lower() == args.role.lower()), None)
+    role = next((item for item in roles if item["name"].lower() == role_name.lower()), None)
     if role is None:
-        raise AdminError(f"No role named {args.role!r}. Roles: {sorted(item['name'] for item in roles)}")
+        raise AdminError(f"No role named {role_name!r}. Roles: {sorted(item['name'] for item in roles)}")
 
-    current = [by_id[perm["feature_id"]] for perm in role["feature_permissions"] if perm["feature_id"] in by_id]
-    writable = [
+    held = {by_id[perm["feature_id"]] for perm in role["feature_permissions"] if perm["feature_id"] in by_id}
+    held_writable = {
         by_id[perm["feature_id"]]
         for perm in role["feature_permissions"]
         if perm.get("can_write") and perm["feature_id"] in by_id
-    ]
-    if identifier in current:
-        print(f"{role['name']} already holds {identifier}.")
-        return
+    }
 
-    # `feature-external-agents` is the umbrella permission every gateway call is checked
-    # against, so it goes on too — the per-agent row alone is not enough. Filtered against
-    # the catalog because an identifier the catalog does not know is a 400 for the whole
-    # request, which would take the role's existing permissions down with it.
-    additions = {identifier, "feature-external-agents"} & known
-    wanted = sorted(set(current) | additions)
     _call(
         client,
         "PATCH",
@@ -208,11 +220,61 @@ def cmd_permit(client: httpx.Client, args: argparse.Namespace) -> None:
             "name": role["name"],
             "description": role.get("description") or "",
             "status": role.get("status") or "Active",
-            "feature_permissions": wanted,
-            "writable_features": sorted(set(writable)),
+            "feature_permissions": sorted(held | readable | writable),
+            "writable_features": sorted(held_writable | writable),
         },
     )
-    print(f"{role['name']} now holds {identifier}.")
+    return role["name"]
+
+
+def cmd_bootstrap(client: httpx.Client, args: argparse.Namespace) -> None:
+    """Grant a role the umbrella permission, which nothing grants by default.
+
+    ``feature-external-agents`` ships seeded but assigned to nobody — deliberately, because
+    it is licensable and assignment is an administrator's decision. Until it is on a role,
+    the agents admin page answers 403 for everyone including the seeded admin, and so does
+    every gateway call.
+
+    Read and write are separate here, unlike the other product features: read means "act
+    through an agent", write means "administer them". Both are granted, because the person
+    running this walkthrough needs to do both.
+    """
+    name = _grant_to_role(
+        client, args.role, readable={"feature-external-agents"}, writable={"feature-external-agents"}
+    )
+    print(f"{name} now holds feature-external-agents (read + write).")
+    print("Read = act through an agent. Write = administer them. Sign in again to pick up the change.")
+
+
+def cmd_role_feature(client: httpx.Client, args: argparse.Namespace) -> None:
+    """Grant a role any catalog feature by identifier.
+
+    Needed more often than it looks on a fresh deployment: the seed migration grants the
+    Administrator role the features that existed when it was written, and every feature
+    added by a later migration — `feature-context-board` and `feature-esms` among them —
+    is granted to nobody. An agent holding a capability the person lacks answers
+    `user_feature_missing`, which reads like an agent problem and is not one.
+    """
+    identifiers = set(_split(args.identifiers))
+    name = _grant_to_role(
+        client, args.role, readable=identifiers, writable=identifiers if args.write else set()
+    )
+    print(f"{name} now holds: {', '.join(sorted(identifiers))}{' (read + write)' if args.write else ''}")
+    print("Sign in again to pick up the change — an existing token carries the old set.")
+
+
+def cmd_permit(client: httpx.Client, args: argparse.Namespace) -> None:
+    """Put one agent's identifier on a role, so people in it can act through that agent."""
+    identifier = f"feature-external-agent-{args.agent_slug}"
+    try:
+        name = _grant_to_role(client, args.role, readable={identifier, "feature-external-agents"}, writable=set())
+    except AdminError as failure:
+        if identifier in str(failure):
+            raise AdminError(
+                f"{identifier!r} is not in the catalog yet. Approve the agent first — that is what creates the row."
+            ) from failure
+        raise
+    print(f"{name} now holds {identifier}.")
     print("Anyone in that role can act through the agent — subject to their own feature permissions.")
 
 
@@ -239,9 +301,17 @@ def main() -> int:
     grants.add_argument("--features", default="")
     grants.add_argument("--tools", default="")
 
+    bootstrap = sub.add_parser("bootstrap", help="grant a role feature-external-agents — do this first")
+    bootstrap.add_argument("--role", default="Administrator")
+
+    role_feature = sub.add_parser("role-feature", help="grant a role any catalog feature by identifier")
+    role_feature.add_argument("identifiers", help="comma separated, e.g. feature-context-board,feature-esms")
+    role_feature.add_argument("--role", default="Administrator")
+    role_feature.add_argument("--write", action="store_true", help="also grant write")
+
     permit = sub.add_parser("permit", help="put the agent on a role so people can use it")
     permit.add_argument("agent_slug")
-    permit.add_argument("--role", default="Admin")
+    permit.add_argument("--role", default="Administrator")
 
     manifests = sub.add_parser("manifests", help="every version this agent has submitted")
     manifests.add_argument("agent_id", type=int)
@@ -257,6 +327,9 @@ def main() -> int:
     reject.add_argument("manifest_id", type=int)
     reject.add_argument("--reason", default="")
 
+    uninstall = sub.add_parser("uninstall", help="remove an agent (clears a pending queue)")
+    uninstall.add_argument("agent_id", type=int)
+
     disable = sub.add_parser("disable", help="the kill switch")
     disable.add_argument("agent_id", type=int)
 
@@ -267,10 +340,13 @@ def main() -> int:
         "capabilities": cmd_capabilities,
         "approve": cmd_approve,
         "grants": cmd_grants,
+        "bootstrap": cmd_bootstrap,
+        "role-feature": cmd_role_feature,
         "permit": cmd_permit,
         "manifests": cmd_manifests,
         "accept": cmd_accept,
         "reject": cmd_reject,
+        "uninstall": cmd_uninstall,
         "disable": cmd_disable,
     }
 
