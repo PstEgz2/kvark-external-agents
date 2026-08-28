@@ -15,6 +15,17 @@ def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 
 
+def _web_root(api_base: str) -> str:
+    """KVARK's web address, inferred from its API address when not configured outright.
+
+    A deployment serves the application and ``/api`` from one origin, so the inference holds
+    there. A local stack does not — the API is on 8008 and the interface on the proxy's own
+    port — which is why ``KVARK_WEB_URL`` exists and why the compose file sets it.
+    """
+    root = api_base.rstrip("/")
+    return root[: -len("/api")] if root.endswith("/api") else root
+
+
 #: Spelt out rather than compared against "true": an unrecognised value must leave
 #: verification ON, so the safe state is the one that survives a typo.
 _FALSE = frozenset({"0", "false", "no", "off"})
@@ -43,6 +54,10 @@ _TOOLS = (
 class Settings:
     #: The agent gateway. Every partner-facing call goes here.
     gateway_base: str
+    #: Where KVARK's own web application lives, for the link back to it. A person who
+    #: arrived here from KVARK is still signed in there — the browser kept that session on
+    #: KVARK's own origin — so returning needs no token handed over, only an address.
+    kvark_web_url: str
     #: KVARK's internal API. Used for exactly one thing — exchanging a person's KVARK
     #: username and password for the access token this agent then acts with. A real
     #: partner integration would receive that token from an identity provider instead;
@@ -97,6 +112,7 @@ class Settings:
             requested_tools=_csv(_env("AGENT_REQUESTED_TOOLS") or _TOOLS),
             poll_seconds=float(_env("AGENT_POLL_SECONDS", "2")),
             verify_tls=_env("KVARK_VERIFY_TLS", "true").lower() not in _FALSE,
+            kvark_web_url=_env("KVARK_WEB_URL") or _web_root(_env("KVARK_API_BASE", "http://localhost:8008/api")),
         )
 
 

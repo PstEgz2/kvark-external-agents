@@ -40,6 +40,10 @@
       <a href="/tools"     class="{{ 'on' if here == '/tools' }}">Tools</a>
       <a href="/calls"     class="{{ 'on' if here == '/calls' }}">Calls</a>
       {% if not identity %}<a href="/login" class="{{ 'on' if here == '/login' }}">Sign in</a>{% endif %}
+      <span class="spacer"></span>
+      {# Nothing is handed over: a person who came from KVARK is still signed in there, on
+         KVARK's own origin, and returning only needs the address. #}
+      <a class="away" href="{{ settings.kvark_web_url }}">Open KVARK &#8599;</a>
     </nav>
   </div>
 </header>

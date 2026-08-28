@@ -60,6 +60,10 @@ nav.tabs a.on {
   color: var(--ink); background: var(--bg);
   border-color: var(--line); margin-bottom: -1px;
 }
+/* Leaves the console, so it does not sit in the tab row as though it were another page. */
+nav.tabs .spacer { flex: 1; }
+nav.tabs a.away { color: var(--ink-dim); border: 1px solid var(--line); border-radius: 6px; }
+nav.tabs a.away:hover { color: var(--ink); border-color: var(--ink-dim); }
 
 /* ---- panels ---------------------------------------------------------- */
 

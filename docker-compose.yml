@@ -12,6 +12,10 @@ services:
       # what makes that name resolve on Linux; Docker Desktop provides it anyway.
       KVARK_GATEWAY_BASE: ${KVARK_GATEWAY_BASE:-http://host.docker.internal:8010/agent-api/v1}
       KVARK_API_BASE: ${KVARK_API_BASE:-http://host.docker.internal:8008/api}
+      # Rendered as a link for the browser, so it is KVARK's interface rather than its API.
+      # A deployment serves both from one origin and this can be left unset; a local stack
+      # splits them, so point it at the proxy the browser actually reaches.
+      KVARK_WEB_URL: ${KVARK_WEB_URL:-https://localhost:30443}
       # The slug derived from AGENT_NAME is permanent, so a clean walkthrough needs a name
       # that has not been used on this deployment before.
       AGENT_NAME: ${AGENT_NAME:-Egzakta Console}
