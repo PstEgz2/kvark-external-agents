@@ -64,14 +64,14 @@ def token_expiry(token: str) -> datetime.datetime | None:
     return datetime.datetime.fromtimestamp(exp, datetime.UTC)
 
 
-async def sign_in(api_base: str, identifier: str, password: str) -> Identity:
+async def sign_in(api_base: str, identifier: str, password: str, *, verify: bool = True) -> Identity:
     """Exchange KVARK credentials for an access token.
 
     Raises:
         IdentityError: the credentials were refused, or KVARK did not answer.
     """
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, verify=verify) as client:
             response = await client.post(
                 f"{api_base}/auth/login", json={"identifier": identifier, "password": password}
             )

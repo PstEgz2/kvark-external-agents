@@ -50,6 +50,12 @@ class AdminError(Exception):
     pass
 
 
+def _verify_tls() -> bool:
+    """Mirrors the agent's own KVARK_VERIFY_TLS, so both halves of the flow reach the same
+    deployment. Any unrecognised value leaves verification on."""
+    return os.environ.get("KVARK_VERIFY_TLS", "true").strip().lower() not in {"0", "false", "no", "off"}
+
+
 def _token(client: httpx.Client) -> str:
     response = client.post(f"{API}/auth/login", json={"identifier": USER, "password": PASSWORD})
     if response.status_code != 200:
@@ -351,7 +357,7 @@ def main() -> int:
     }
 
     try:
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=30.0, verify=_verify_tls()) as client:
             client.headers["Authorization"] = f"Bearer {_token(client)}"
             handlers[args.command](client, args)
     except AdminError as failure:

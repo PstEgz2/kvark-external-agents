@@ -117,9 +117,10 @@ class Gateway:
     for and is passed per call, because one running agent serves several signed-in people.
     """
 
-    def __init__(self, base_url: str, *, timeout: float = 60.0) -> None:
+    def __init__(self, base_url: str, *, timeout: float = 60.0, verify: bool = True) -> None:
         self.base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self._verify = verify
 
     # -- plumbing ---------------------------------------------------------------
 
@@ -145,7 +146,7 @@ class Gateway:
         status: int | None = None
         reason: str | None = None
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
+            async with httpx.AsyncClient(timeout=self._timeout, verify=self._verify) as client:
                 response = await client.request(
                     method, f"{self.base_url}{path}", headers=headers, json=json, params=params
                 )

@@ -15,6 +15,11 @@ def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 
 
+#: Spelt out rather than compared against "true": an unrecognised value must leave
+#: verification ON, so the safe state is the one that survives a typo.
+_FALSE = frozenset({"0", "false", "no", "off"})
+
+
 def _csv(value: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
 
@@ -68,6 +73,11 @@ class Settings:
     requested_tools: tuple[str, ...]
     #: How often the chat console asks KVARK whether a turn has settled.
     poll_seconds: float
+    #: Whether to verify KVARK's TLS certificate. On by default and meant to stay on. A
+    #: preview deployment serves a self-signed certificate that names neither its own host
+    #: nor its address, so verification there fails on the chain *and* the hostname and
+    #: cannot be fixed by trusting the certificate; turning this off is how you talk to one.
+    verify_tls: bool
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -86,6 +96,7 @@ class Settings:
             requested_features=_csv(_env("AGENT_REQUESTED_FEATURES") or _FEATURES),
             requested_tools=_csv(_env("AGENT_REQUESTED_TOOLS") or _TOOLS),
             poll_seconds=float(_env("AGENT_POLL_SECONDS", "2")),
+            verify_tls=_env("KVARK_VERIFY_TLS", "true").lower() not in _FALSE,
         )
 
 

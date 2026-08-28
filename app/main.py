@@ -32,7 +32,7 @@ app = FastAPI(title="KVARK External Agent", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-gateway = Gateway(settings.gateway_base)
+gateway = Gateway(settings.gateway_base, verify=settings.verify_tls)
 store = Store(settings.state_path)
 
 #: Signed-in people, keyed by an opaque cookie. Held in memory rather than in the cookie
@@ -301,7 +301,7 @@ async def do_login(
         who = Identity(label="(pasted token)", token=token.strip(), expires_at=token_expiry(token.strip()))
     else:
         try:
-            who = await sign_in(settings.kvark_api_base, identifier.strip(), password)
+            who = await sign_in(settings.kvark_api_base, identifier.strip(), password, verify=settings.verify_tls)
         except IdentityError as refused:
             return _page(request, "login.html", form_error=str(refused), identifier=identifier)
 

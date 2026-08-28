@@ -34,6 +34,9 @@ services:
       AGENT_REQUESTED_FEATURES: ${AGENT_REQUESTED_FEATURES:-}
       AGENT_REQUESTED_TOOLS: ${AGENT_REQUESTED_TOOLS:-}
       AGENT_POLL_SECONDS: ${AGENT_POLL_SECONDS:-2}
+      # A rack PR preview serves a self-signed certificate that names neither its host nor
+      # its address, so pointing at one means setting this to false. Anything real: leave it.
+      KVARK_VERIFY_TLS: ${KVARK_VERIFY_TLS:-true}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
