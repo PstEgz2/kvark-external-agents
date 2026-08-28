@@ -35,6 +35,9 @@
       <a class="btn" href="/chat">Open the console →</a>
       <a class="btn" href="/manifest.json">Manifest as JSON</a>
       <a class="btn" href="/healthz">Health</a>
+      {# The page somebody arriving from KVARK lands on, so the way back belongs here too —
+         base.html's nav does not reach this template. #}
+      <a class="btn" href="{{ settings.kvark_web_url }}">Open KVARK &#8599;</a>
     </p>
     <p class="hint" style="margin-top:12px">
       This page is the address given to KVARK as <code>base_url</code>. It is deliberately
