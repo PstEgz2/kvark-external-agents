@@ -7,6 +7,10 @@ service, the service is right — check `GET /agent-api/v1/docs` for the live sc
 
 ---
 
+Looking for one endpoint's parameters or response shape? That is
+**[api-reference.md](api-reference.md)**. This page explains the surface and the order to use
+it in; that one is the lookup.
+
 ## The shape of it
 
 Your agent is an ordinary HTTP client. It holds one long-lived key, and it acts **on behalf of
@@ -226,6 +230,7 @@ All of these need both credentials, and all are gated on what the administrator 
 
 | What | Call |
 |---|---|
+| See what this deployment can grant | `GET /capabilities` |
 | Search the corpus | `GET /search?q=…` |
 | Read a document | `POST /preview` |
 | Read a conversation document | `POST /preview/messages` |

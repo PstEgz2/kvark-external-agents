@@ -6,6 +6,8 @@ worked example you can run.
 - **[docs/writing-an-external-agent.md](docs/writing-an-external-agent.md)** — the guide.
   Registration, acting for a person, asking questions, the refusals and what each one means.
   Verified against a running gateway rather than written from the source.
+- **[docs/api-reference.md](docs/api-reference.md)** — every endpoint, its parameters and
+  what it returns. The lookup, where the guide is the explanation.
 - **This repository** — that guide as working code: a console that exercises every endpoint
   the gateway publishes, so the whole surface can be driven by hand.
 
