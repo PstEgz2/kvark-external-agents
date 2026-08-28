@@ -27,13 +27,14 @@ published endpoint and one error type, and it is the part worth copying.
 | Guide section | Here |
 |---|---|
 | 1 · Register | **Agent** tab. Persists the key, which is shown once. |
-| 2 · Act for a person | **Sign in**. KVARK credentials, or a pasted bearer token. |
+| 2 · Act for a person | **Sign in**. KVARK credentials, a pasted bearer token, or a token posted here by KVARK's own *Open agent, signed in*. |
 | 3 · Ask a question | **Chat**. `202` handle, then polls until `done` or `failed`. Session continuation, board scoping, document scoping. |
 | 4 · The other things | **Search**, **Documents** (pages, conversations, signed page images), **Boards**, **Tools**. |
 | 5 · Changing what you are | **Manifest**. Partial submissions, the `submitted` vs `document` diff, the refusals worth provoking. |
 | 6 · Errors | Every refusal renders as `status · reason · detail`, with a note on whether retrying can help. |
 | 7 · A minimal agent | `app/kvark.py` is that snippet, finished. |
 | 8 · Health | `GET /healthz`, answered from memory. |
+| — | **Open KVARK** on every page, for the trip back. |
 
 Plus a **Calls** tab holding every request this process has made, and a one-click smoke run
 that calls the whole surface once and reports what each endpoint answered.
@@ -74,6 +75,50 @@ AGENT_STATE_PATH=./data/agent.json \
 uvicorn app.main:app --port 8099
 ```
 
+### Pointing it at a deployment
+
+A deployment serves the gateway on the same origin as KVARK itself, proxied under
+`/agent-api/`, so there is one host and one port to know:
+
+```bash
+KVARK_GATEWAY_BASE=https://kvark.example/agent-api/v1
+KVARK_API_BASE=https://kvark.example/api
+```
+
+A PR preview serves a self-signed certificate that names neither its host nor its address, so
+verification there fails on the chain *and* the hostname and cannot be fixed by trusting the
+certificate. `KVARK_VERIFY_TLS=false` is how you talk to one. Leave it alone for anything
+real.
+
+### Settings
+
+| | |
+|---|---|
+| `KVARK_GATEWAY_BASE` | The gateway. Every partner-facing call goes here. |
+| `KVARK_API_BASE` | KVARK's own API, used for exactly one call — exchanging a person's credentials for a token. |
+| `KVARK_WEB_URL` | KVARK's interface, for the **Open KVARK** link. Inferred from `KVARK_API_BASE` when unset, which is right for a deployment and wrong for a local stack that serves the two on different ports. |
+| `KVARK_VERIFY_TLS` | Verify KVARK's certificate. On by default; any unrecognised value leaves it on. |
+| `AGENT_NAME` | The slug derived from it is permanent. A rename means a new registration. |
+| `AGENT_HEALTH_URL` | Leave empty unless a public HTTPS address fronts this container. |
+| `AGENT_STATE_PATH` | Where the registration receipt lands. The API key is shown once; this is the only copy. |
+
+---
+
+## Moving between KVARK and here
+
+Both directions work without signing in twice, and neither needs the two applications to
+share anything but a browser.
+
+**KVARK → here.** KVARK's **Agents** page offers *Open agent, signed in*, which posts the
+person's KVARK token to this application's `/login`. That endpoint accepts a token it did not
+mint — the same door the directory exchange will come through — so nothing here is specific
+to that button. The token is only carried over https, or over http on loopback: a bearer
+credential must not cross an unencrypted hop, and loopback never reaches a wire.
+
+**Here → KVARK.** The **Open KVARK** link. Nothing is carried at all: somebody who arrived
+from KVARK is still signed in there, on KVARK's own origin, and returning needs only an
+address.
+
 ---
 
 ## The walkthrough
@@ -82,16 +127,17 @@ uvicorn app.main:app --port 8099
    `AGENT_STATE_PATH` and is the only copy that will ever exist.
 2. Every call now answers `403 agent_pending_approval`. That is correct and it is not
    transient.
-3. **Grant the umbrella permission — once per deployment.** `feature-external-agents` ships
-   seeded but assigned to nobody, deliberately, so the agents admin page answers 403 for
-   everyone including the seeded `admin` until:
+3. **The umbrella permission is already granted.** A migration gives the `Administrator`
+   role `feature-external-agents`, read and write, so a deployment built from migrations
+   arrives with the surface switched on rather than invisible to everyone including the
+   seeded `admin`. Read means *act through an agent*, write means *administer them* — the
+   feature is deliberately not single-flag, so both are granted.
+
+   On a deployment predating that migration, or to grant a different role:
 
    ```bash
    python scripts/kvark_admin.py bootstrap --role Administrator
    ```
-
-   Read means *act through an agent*, write means *administer them* — this feature is
-   deliberately not single-flag, so both are granted.
 
 4. **Approve** it, as an administrator would:
 
@@ -151,6 +197,13 @@ AGENT_GATEWAY_IDP_JWKS_URL=https://…
 
 Nothing else in this application changes when that lands — everything downstream already
 treats the token as opaque, and the **Sign in** tab's token box is already that shape.
+
+KVARK's *Open agent, signed in* uses that same door today, and is an interim measure rather
+than the destination: it hands over the person's full KVARK access token, which reaches every
+internal endpoint they can, not only the dozen this gateway publishes. That is wider than the
+gateway's own promise — an agent seeing no more than the person it acts for — and it is
+accepted deliberately while the directory exchange is unconfigured. The exchange replaces it
+with a token scoped to this gateway, and the button then carries that instead.
 
 ---
 

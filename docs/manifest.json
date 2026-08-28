@@ -18,6 +18,5 @@
     "list_document_versions",
     "filter_documents"
   ],
-  "health_url": "https://example.com/",
   "turn_timeout_seconds": 120
 }

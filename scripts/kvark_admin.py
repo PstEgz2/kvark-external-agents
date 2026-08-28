@@ -234,12 +234,13 @@ def _grant_to_role(client: httpx.Client, role_name: str, readable: set[str], wri
 
 
 def cmd_bootstrap(client: httpx.Client, args: argparse.Namespace) -> None:
-    """Grant a role the umbrella permission, which nothing grants by default.
+    """Grant a role the umbrella permission.
 
-    ``feature-external-agents`` ships seeded but assigned to nobody — deliberately, because
-    it is licensable and assignment is an administrator's decision. Until it is on a role,
-    the agents admin page answers 403 for everyone including the seeded admin, and so does
-    every gateway call.
+    A migration puts ``feature-external-agents`` on the ``Administrator`` role, so a
+    deployment built from migrations needs none of this. It is still the way to reach any
+    other role, and the way to repair a deployment that predates that migration — where the
+    agents admin page answers 403 for everyone including the seeded admin, and so does every
+    gateway call.
 
     Read and write are separate here, unlike the other product features: read means "act
     through an agent", write means "administer them". Both are granted, because the person
@@ -307,7 +308,7 @@ def main() -> int:
     grants.add_argument("--features", default="")
     grants.add_argument("--tools", default="")
 
-    bootstrap = sub.add_parser("bootstrap", help="grant a role feature-external-agents — do this first")
+    bootstrap = sub.add_parser("bootstrap", help="grant a role feature-external-agents (Administrator already has it)")
     bootstrap.add_argument("--role", default="Administrator")
 
     role_feature = sub.add_parser("role-feature", help="grant a role any catalog feature by identifier")

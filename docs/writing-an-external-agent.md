@@ -23,12 +23,16 @@ integration mistakes come from missing one of them:
 ```
                     X-Agent-Key: kvag_…          ← which agent
                     Authorization: Bearer …      ← which person
-   your agent ───────────────────────────────►  KVARK gateway  :8010
+   your agent ───────────────────────────────►  KVARK gateway
                                                       │
                     202 / 200 / a refusal ◄───────────┘
 ```
 
-Base URL for everything below: `http://<kvark-host>:8010/agent-api/v1`
+Base URL for everything below: `https://<kvark-host>/agent-api/v1`
+
+A deployment serves the gateway on the same origin as KVARK itself, proxied under
+`/agent-api/`, so there is one host to know. A local stack runs it on its own port instead —
+`http://localhost:8010/agent-api/v1` — because there is no proxy in front of it there.
 
 ---
 
@@ -121,6 +125,13 @@ identity-provider token. If you send one it does not recognise, you get
 
 The person must exist in KVARK, must be permitted to use your agent, and must themselves have
 the feature you are using. Any of those failing is a `403` with a distinct `reason`.
+
+**You are not required to collect the token yourself.** A deployment may hand it to you: KVARK's
+Agents page can open your application with the person's token in the body of a form POST, to
+whatever path you choose to accept it on. Treat that as one more way a token arrives — it is
+opaque to you either way, and the gateway is what decides whether it is good. Asking a person
+for their KVARK password instead is the arrangement worth avoiding, and the reason both this
+and the directory exchange exist.
 
 **The two credentials are checked in order, and your key is checked first.** While you are
 still awaiting approval every call answers `agent_pending_approval` — even one you sent with
@@ -378,7 +389,7 @@ Two that catch people out:
 ```python
 import time, httpx
 
-BASE = "http://localhost:8010/agent-api/v1"
+BASE = "https://kvark.example/agent-api/v1"
 
 def register() -> str:
     r = httpx.post(f"{BASE}/register", json={
